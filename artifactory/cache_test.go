@@ -39,7 +39,7 @@ func TestCachedOperations(t *testing.T) {
 	t.Run("Cache miss and set", func(t *testing.T) {
 		key := "test_key_1"
 		cached := NewCached(key, cache, logger)
-		defer cached.Close()
+		defer cached.AbortTimeout()
 
 		// Should not have cached response initially
 		_, exists := cached.GetCachedResponse()
@@ -72,7 +72,7 @@ func TestCachedOperations(t *testing.T) {
 	t.Run("Cache expiration", func(t *testing.T) {
 		key := "test_key_2"
 		cached := NewCached(key, cache, logger)
-		defer cached.Close()
+		defer cached.AbortTimeout()
 
 		// Cache a response
 		testResponse := &ApiResponse{
@@ -107,7 +107,7 @@ func TestCachedOperations(t *testing.T) {
 				NodeId: fmt.Sprintf("node-%d", i),
 			}
 			cached.CacheResponse(testResponse)
-			cached.Close()
+			cached.AbortTimeout()
 		}
 
 		// Wait for expiration
@@ -138,7 +138,7 @@ func TestCachedChannels(t *testing.T) {
 	t.Run("Channel operations", func(t *testing.T) {
 		key := "channel_test"
 		cached := NewCached(key, cache, logger)
-		defer cached.Close()
+		defer cached.AbortTimeout()
 
 		// Test that channels are created
 		if cached.responses == nil {
@@ -172,7 +172,7 @@ func TestCachedChannels(t *testing.T) {
 	t.Run("Error channel", func(t *testing.T) {
 		key := "error_test"
 		cached := NewCached(key, cache, logger)
-		defer cached.Close()
+		defer cached.AbortTimeout()
 
 		// Test sending error through channel
 		go func() {
