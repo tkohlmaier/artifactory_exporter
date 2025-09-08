@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -80,6 +81,7 @@ type Cached struct {
 	timeout     context.Context
 	cancel      context.CancelFunc
 	stopTimeout func() bool
+	closed      *atomic.Bool
 
 	responseCache *ResponseCache
 	cacheKey      string
@@ -94,10 +96,14 @@ func NewCached(cacheKey string, r *ResponseCache, logger *slog.Logger) *Cached {
 	var timeout context.Context
 	var cancel context.CancelFunc
 	var stopTimeout func() bool
+	closed := new(atomic.Bool)
 	// Only use timeout if response cache is configured.
 	if r != nil {
 		timeout, cancel = context.WithTimeout(context.Background(), r.timeout)
 		stopTimeout = context.AfterFunc(timeout, func() {
+			if closed.Load() {
+				return // already finished
+			}
 			logger.Warn("Cache request timed out", "timeout", r.timeout)
 			errors <- fmt.Errorf("request timed out after %d seconds", int(r.timeout.Seconds()))
 		})
@@ -115,20 +121,17 @@ func NewCached(cacheKey string, r *ResponseCache, logger *slog.Logger) *Cached {
 		timeout:       timeout,
 		cancel:        cancel,
 		stopTimeout:   stopTimeout,
+		closed:        closed,
 		responseCache: r,
 		cacheKey:      cacheKey,
 		logger:        logger,
 	}
 }
 
-func (c *Cached) Close() {
-	if !c.stopTimeout() {
-		// timeout func already triggered
-		<-c.errors
-	}
+func (c *Cached) AbortTimeout() {
+	c.closed.Store(true)
+	c.stopTimeout()
 	c.cancel()
-	close(c.errors)
-	close(c.responses)
 }
 
 func (c *Cached) CacheResponse(response *ApiResponse) {

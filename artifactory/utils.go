@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"sync"
 )
 
 const (
@@ -125,16 +124,8 @@ func (c *Client) makeCachedRequest(method string, path string, body []byte, head
 	key := fmt.Sprintf("%s_%s_%s", method, path, body)
 	cached := NewCached(key, c.responseCache, c.logger)
 
-	var wg sync.WaitGroup
-	wg.Add(2) // wait for sender and receiver goroutines
-	defer wg.Done()
 	go func() {
-		wg.Wait()
-		cached.Close()
-	}()
-
-	go func() {
-		defer wg.Done()
+		defer cached.AbortTimeout()
 		resp, err := c.makeRequest(method, path, body, headers)
 		if err != nil {
 			c.logger.Error(
